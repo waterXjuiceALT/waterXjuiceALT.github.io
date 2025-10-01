@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Celsius ↔ Fahrenheit — Converter</title>
+  <style>
+    :root{
+      --bg:#0f1724;
+      --card:#0b1220;
+      --muted:#9aa4b2;
+      --accent1:#7dd3fc;
+      --accent2:#a78bfa;
+      --glass: rgba(255,255,255,0.04);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),#081020 60%);color:#e6eef6}
+    .wrap{min-height:100vh;display:grid;place-items:center;padding:32px}
+    .card{
+      width:100%;max-width:760px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);border-radius:14px;padding:28px;box-shadow:0 8px 30px rgba(3,7,18,0.6);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.04)
+    }
+    h1{margin:0 0 8px;font-weight:600;font-size:20px;letter-spacing:-0.2px}
+    p.lead{margin:0 0 20px;color:var(--muted);font-size:13px}
+    .converter{display:grid;grid-template-columns:1fr 64px 1fr;gap:16px;align-items:center}
+    .field{background:var(--glass);padding:14px;border-radius:10px;border:1px solid rgba(255,255,255,0.03)}
+    label{display:block;font-size:12px;color:var(--muted);margin-bottom:8px}
+    input[type="text"]{width:100%;padding:10px 12px;font-size:18px;border-radius:8px;border:1px solid rgba(0,0,0,0.25);background:transparent;color:inherit;outline:none}
+    input[readonly]{opacity:0.9}
+    .swap-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px;background:linear-gradient(180deg,var(--accent1),var(--accent2));border-radius:12px;border:none;color:#042034;cursor:pointer;box-shadow:0 6px 18px rgba(124,58,237,0.18);width:64px;height:64px}
+    .swap-btn:active{transform:translateY(1px) scale(0.995)}
+    .controls{display:flex;gap:10px;align-items:center;margin-top:18px}
+    .btn{padding:10px 14px;border-radius:10px;border:none;cursor:pointer;background:linear-gradient(90deg,var(--accent2),var(--accent1));color:#011022;font-weight:600}
+    .small{font-size:13px;padding:8px 10px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted)}
+    .hint{margin-top:12px;color:var(--muted);font-size:13px}
+    footer{margin-top:20px;color:var(--muted);font-size:12px;text-align:right}
+    @media (max-width:640px){
+      .converter{grid-template-columns:1fr 48px 1fr}
+      .swap-btn{width:48px;height:48px}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card" role="application" aria-label="Temperature converter">
+      <h1>Celsius ↔ Fahrenheit Converter</h1>
+      <p class="lead">Type a temperature, press Convert (or Enter). Use the swap button to flip conversion direction and swap values.</p>
+      <div class="converter" id="converter">
+        <div class="field">
+          <label id="label-input" for="valueInput">Celsius (°C)</label>
+          <input inputmode="decimal" aria-labelledby="label-input" id="valueInput" type="text" autocomplete="off" placeholder="e.g. 36.6" />
+        </div>
+        <button class="swap-btn" id="swap" title="Swap conversion direction" aria-pressed="false">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M3 12h14" stroke="#022" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M12 5l7 7-7 7" stroke="#022" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span style="font-size:11px;margin-top:6px;opacity:.85">swap</span>
+        </button>
+        <div class="field">
+          <label id="label-output" for="valueOutput">Fahrenheit (°F)</label>
+          <input id="valueOutput" type="text" readonly aria-labelledby="label-output" placeholder="—" />
+        </div>
+      </div>
+      <div class="controls">
+        <button class="btn" id="convert">Convert</button>
+        <button class="small" id="clear">Clear</button>
+        <div style="flex:1"></div>
+        <div class="hint" id="modeHint">Mode: <strong id="modeText">Celsius → Fahrenheit</strong></div>
+      </div>
+      <footer>Made with ❤️ — waterXjuice (AO)</footer>
+    </div>
+  </div>
+  <script>
+    (function(){
+      const input = document.getElementById('valueInput');
+      const output = document.getElementById('valueOutput');
+      const convertBtn = document.getElementById('convert');
+      const swapBtn = document.getElementById('swap');
+      const clearBtn = document.getElementById('clear');
+      const labelInput = document.getElementById('label-input');
+      const labelOutput = document.getElementById('label-output');
+      const modeText = document.getElementById('modeText');
+      const modeHint = document.getElementById('modeHint');
+      let mode = true;
+      function sanitizeNumber(str){
+        if (typeof str !== 'string') return NaN;
+        str = str.trim();
+        str = str.replace(',', '.');
+        str = str.replace(/\s+/g,'');
+        if (str === '' || str === '+' || str === '-') return NaN;
+        const n = Number(str);
+        return Number.isFinite(n) ? n : NaN;
+      }
+      function cToF(c){ return (c * 9/5) + 32; }
+      function fToC(f){ return (f - 32) * 5/9; }
+      function format(n){
+        if (!Number.isFinite(n)) return '—';
+        return parseFloat(Math.round(n * 100) / 100).toString();
+      }
+      function convert(){
+        const val = sanitizeNumber(input.value);
+        if (!Number.isFinite(val)){
+          output.value = 'Invalid input';
+          output.setAttribute('aria-invalid','true');
+          return;
+        }
+        output.removeAttribute('aria-invalid');
+        const res = mode ? cToF(val) : fToC(val);
+        output.value = format(res);
+      }
+      convertBtn.addEventListener('click', convert);
+      input.addEventListener('keydown', function(e){ if (e.key === 'Enter'){ convert(); } });
+      swapBtn.addEventListener('click', function(){
+        mode = !mode;
+        if (mode){
+          labelInput.textContent = 'Celsius (°C)';
+          labelOutput.textContent = 'Fahrenheit (°F)';
+          modeText.textContent = 'Celsius → Fahrenheit';
+        } else {
+          labelInput.textContent = 'Fahrenheit (°F)';
+          labelOutput.textContent = 'Celsius (°C)';
+          modeText.textContent = 'Fahrenheit → Celsius';
+        }
+        const inVal = sanitizeNumber(input.value);
+        const outVal = sanitizeNumber(output.value);
+        if (Number.isFinite(outVal)){
+          input.value = output.value;
+        } else if (!Number.isFinite(inVal)){
+          input.value = '';
+          output.value = '';
+        }
+        swapBtn.setAttribute('aria-pressed', String(!mode));
+        const maybe = sanitizeNumber(input.value);
+        if (Number.isFinite(maybe)) convert(); else output.value = '—';
+      });
+      clearBtn.addEventListener('click', function(){ input.value=''; output.value=''; input.focus(); output.removeAttribute('aria-invalid'); });
+      let timer = null;
+      input.addEventListener('input', function(){
+        output.removeAttribute('aria-invalid');
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(function(){
+          const n = sanitizeNumber(input.value);
+          if (Number.isFinite(n)) convert();
+          else output.value = '';
+        }, 300);
+      });
+      output.value = '';
+      input.placeholder = 'e.g. 100';
+    })();
+  </script>
+</body>
+</html>
